@@ -237,7 +237,6 @@ void VehicleCmdGate::onAutoHazardLightsCmd(
 {
   auto_commands_.hazard_light = *msg;
   auto_commands_.hazard_light.stamp = this->now();
-  
 }
 
 void VehicleCmdGate::onAutoShiftCmd(
