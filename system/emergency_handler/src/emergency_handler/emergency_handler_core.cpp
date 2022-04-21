@@ -305,7 +305,10 @@ EmergencyHandler::selectAlternativeControlCommand()
   // Emergency Stop
   {
     autoware_auto_control_msgs::msg::AckermannControlCommand emergency_stop_cmd;
+    emergency_stop_cmd.stamp = this->now();
+    emergency_stop_cmd.lateral.stamp = this->now();
     emergency_stop_cmd.lateral = prev_control_command_->lateral;
+    emergency_stop_cmd.longitudinal.stamp = this->now();
     emergency_stop_cmd.longitudinal.speed = 0.0;
     emergency_stop_cmd.longitudinal.acceleration = -2.5;
 

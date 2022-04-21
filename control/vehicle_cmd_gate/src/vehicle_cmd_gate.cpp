@@ -229,18 +229,22 @@ void VehicleCmdGate::onAutoTurnIndicatorsCmd(
   autoware_auto_vehicle_msgs::msg::TurnIndicatorsCommand::ConstSharedPtr msg)
 {
   auto_commands_.turn_indicator = *msg;
+  auto_commands_.turn_indicator.stamp = this->now();
 }
 
 void VehicleCmdGate::onAutoHazardLightsCmd(
   autoware_auto_vehicle_msgs::msg::HazardLightsCommand::ConstSharedPtr msg)
 {
   auto_commands_.hazard_light = *msg;
+  auto_commands_.hazard_light.stamp = this->now();
+  
 }
 
 void VehicleCmdGate::onAutoShiftCmd(
   autoware_auto_vehicle_msgs::msg::GearCommand::ConstSharedPtr msg)
 {
   auto_commands_.gear = *msg;
+  auto_commands_.gear.stamp = this->now();
 }
 
 // for remote
@@ -248,6 +252,7 @@ void VehicleCmdGate::onRemoteCtrlCmd(
   autoware_auto_control_msgs::msg::AckermannControlCommand::ConstSharedPtr msg)
 {
   remote_commands_.control = *msg;
+  remote_commands_.control.stamp = this->now();
 
   if (current_gate_mode_.data == tier4_control_msgs::msg::GateMode::EXTERNAL) {
     publishControlCommands(remote_commands_);
@@ -258,18 +263,21 @@ void VehicleCmdGate::onRemoteTurnIndicatorsCmd(
   autoware_auto_vehicle_msgs::msg::TurnIndicatorsCommand::ConstSharedPtr msg)
 {
   remote_commands_.turn_indicator = *msg;
+  remote_commands_.turn_indicator.stamp = this->now();
 }
 
 void VehicleCmdGate::onRemoteHazardLightsCmd(
   autoware_auto_vehicle_msgs::msg::HazardLightsCommand::ConstSharedPtr msg)
 {
   remote_commands_.hazard_light = *msg;
+  remote_commands_.hazard_light.stamp = this->now();
 }
 
 void VehicleCmdGate::onRemoteShiftCmd(
   autoware_auto_vehicle_msgs::msg::GearCommand::ConstSharedPtr msg)
 {
   remote_commands_.gear = *msg;
+  remote_commands_.gear.stamp = this->now();
 }
 
 // for emergency
@@ -277,6 +285,7 @@ void VehicleCmdGate::onEmergencyCtrlCmd(
   autoware_auto_control_msgs::msg::AckermannControlCommand::ConstSharedPtr msg)
 {
   emergency_commands_.control = *msg;
+  emergency_commands_.control.stamp = this->now();
 
   if (use_emergency_handling_ && is_system_emergency_) {
     publishControlCommands(emergency_commands_);
@@ -286,11 +295,13 @@ void VehicleCmdGate::onEmergencyHazardLightsCmd(
   autoware_auto_vehicle_msgs::msg::HazardLightsCommand::ConstSharedPtr msg)
 {
   emergency_commands_.hazard_light = *msg;
+  emergency_commands_.hazard_light.stamp = this->now();
 }
 void VehicleCmdGate::onEmergencyShiftCmd(
   autoware_auto_vehicle_msgs::msg::GearCommand::ConstSharedPtr msg)
 {
   emergency_commands_.gear = *msg;
+  emergency_commands_.gear.stamp = this->now();
 }
 
 void VehicleCmdGate::onTimer()
