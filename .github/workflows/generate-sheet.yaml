@@ -1,0 +1,124 @@
+name: generate-sheet
+
+on:
+  push:
+    branches:
+      - beta/v*
+      - sync-upstream
+      - feat/spreadsheet-release-note
+    tags:
+      - v*
+  workflow_dispatch:
+    inputs:
+      beta-branch-or-tag-name:
+        description: The name of the beta branch or tag to release
+        type: string
+        required: true
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set tag name
+        id: set-tag-name
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REF_NAME="${{ github.event.inputs.beta-branch-or-tag-name }}"
+          else
+            REF_NAME="${{ github.ref_name }}"
+          fi
+
+          echo ::set-output name=ref-name::"$REF_NAME"
+          echo ::set-output name=tag-name::"${REF_NAME#beta/}"
+
+      - name: Check out repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          ref: ${{ steps.set-tag-name.outputs.ref-name }}
+
+      - name: Set target name for beta branches
+        id: set-target-name
+        run: |
+          if [[ "${{ steps.set-tag-name.outputs.ref-name }}" =~ "beta/" ]]; then
+            echo ::set-output name=target-name::\
+              "${{ steps.set-tag-name.outputs.ref-name }}"
+          fi
+
+      - name: Create a local tag for beta branches
+        run: |
+          # if [ "${{ steps.set-target-name.outputs.target-name }}" != "" ]; then
+          #   git tag "${{ steps.set-tag-name.outputs.tag-name }}"
+          # fi
+          git tag v0.5.0
+
+      - name: Run generate-changelog
+        id: generate-changelog
+        uses: shmpwk/autoware-github-actions/generate-changelog@dev
+        with:
+          save-json-output: true
+
+      - name: Select verb
+        id: select-verb
+        run: |
+          has_previous_draft=$(gh release view --json isDraft -q ".isDraft"\
+          "${{ steps.set-tag-name.outputs.tag-name }}") || true
+
+          verb=create
+          if [ "$has_previous_draft" = "true" ]; then
+            verb=edit
+          fi
+
+          echo ::set-output name=verb::"$verb"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Arrange json data
+        id: arrange-json
+        run: |
+          r='${{ steps.generate-changelog.outputs.changelog }}'
+          jqlink=$(echo $r | jq '.[].commits | map({ link: .links[1].href})')
+          bodies_array=()
+          for i in $(echo $jqlink | jq -c ); do
+            urls=$(echo $i | jq -r '.[].link')
+            for url in $urls; do
+              gh_url=$(echo $url | sed 's/https:\/\/github.com/\/repos/g' | sed 's/pull/pulls/g')
+              body=$(gh api -H "Accept: application/vnd.github+json" $gh_url | jq '.body')
+              description=$(echo $body | awk -F "##" '{print $1, $2}' | sed 's/'\''//g')
+              related_links=$(echo $body | awk -F "##" '{print $3}' | awk '/Related Links/{print}')
+              test_performed=$(echo $body | awk -F "##" '{print $4}' | awk '/Test Performed/{print}')
+              note_for_reviewers=$(echo $body | awk -F "##" '{print $5}' | awk '/Note for Reviwers/{print}')
+              bodies=$(jq -nc --arg description "$description" \
+                --arg related_links "$related_links" \
+                '{"description": $description, "related_links": $related_links}')
+              bodies_array+=("$bodies")
+            done
+          done
+          #jqdata=$(echo $r | jq -rc '.[].commits | map({ title: .message, body: .body})')
+          jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({ title: .message, body: .body})')
+          array=$(echo "${bodies_array[@]}" | jq -cs .)
+          #array="[$bodies_array//'} {'/'},{'}]"
+          echo $jqdata
+          echo $array
+          jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({message: .[0].title, body: .[1].description})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
+          echo $jqdatas
+          echo "======================"
+          echo ::set-output name=jdata::"$jqdatas"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: create json
+        run: >
+          curl -v "${{ secrets.EXEC_URL }}"
+          -H "Accept: application/json"
+          -H "Content-type: application/json"
+          -X POST
+          -w '\n'
+          -d '${{ steps.arrange-json.outputs.jdata }}'
+
+      - name: Show relese note
+        run: |
+          echo $NOTES
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.arrange-json.outputs.jdata }}
