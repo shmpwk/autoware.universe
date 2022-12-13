@@ -17,7 +17,7 @@ on:
         required: false
 
 jobs:
-  github-release:
+  generate-sheet:
     runs-on: ubuntu-latest
     steps:
       - name: Set tag name
