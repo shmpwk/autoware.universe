@@ -74,8 +74,7 @@ jobs:
       - name: Arrange json data
         id: arrange-json
         run: |
-          r='${{ steps.generate-changelog.outputs.changelog }}'
-          links=$(echo $r | jq -c '.[].commits | map({ link: .links[1].href})')
+          links=$(echo $NOTE | xargs -n 1 | jq -c '.[].commits | map({ link: .links[1].href})')
           bodies_array=()
           for link in $links; do
             for url in $(echo $link | jq -r '.[].link'); do
@@ -124,6 +123,8 @@ jobs:
           echo ::set-output name=jdata::"$jqdatas"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.generate-changelog.outputs.changelog }}
+
 
       - name: create json
         run: >
