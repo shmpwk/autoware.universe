@@ -90,7 +90,6 @@ jobs:
 
               # PR body
               body=$(echo $gh_response | jq '.body')
-              echo $body
               if [ -z "$body" ]; then body="UNDEFINED"; fi
               # PR Description
               description=$(echo $body | awk -F "##" '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*jp>//g' | sed 's/Description//g' | sed 's/\\r\\n//g'| sed 's/<!--.*-->//g')
@@ -122,7 +121,6 @@ jobs:
           jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message, author: .author.name})')
           array=$(echo "${bodies_array[@]}" | jq -cs .)
           jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [0].author, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
-          echo $jqdatas
           echo ::set-output name=jdata::"$jqdatas"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
