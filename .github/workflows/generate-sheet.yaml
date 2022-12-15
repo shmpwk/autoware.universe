@@ -55,7 +55,7 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          git-cliff-args: d434e87e5bad288a4016864e1bf8730c3733f08a..
+          git-cliff-args: d434e87e5bad288a4016864e1bf8730c3733f08a..626949662e8bcc76fa76e51b5e40fd5bf40d4f13
 
       # - name: Select verb
       #   id: select-verb
@@ -75,7 +75,8 @@ jobs:
       - name: Arrange json data
         id: arrange-json
         run: |
-          links=$(echo $NOTE | xargs -n 1 | jq -c '.[].commits | map({ link: .links[1].href})')
+          r=$(cat context.json | jq .)
+          links=$(echo $r | jq -c '.[].commits | map({ link: .links[3].href})')
           bodies_array=()
           for link in $links; do
             for url in $(echo $link | jq -r '.[].link'); do
@@ -117,14 +118,13 @@ jobs:
               bodies_array+=("$bodies")
             done
           done
-          # tyoe, scope, title
+          # id, tyoe, scope, title, author
           jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message, author: .author.name})')
           array=$(echo "${bodies_array[@]}" | jq -cs .)
           jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [0].author, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
           echo ::set-output name=jdata::"$jqdatas"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NOTES: ${{ steps.generate-changelog.outputs.changelog }}
 
 
       - name: create json
