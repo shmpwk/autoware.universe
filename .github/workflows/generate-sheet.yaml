@@ -55,7 +55,7 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          git-cliff-args: d434e87e5bad288a4016864e1bf8730c3733f08a..72f34cff0d217668fa1d4ca9d0c4a858f4094ef8
+          git-cliff-args: d434e87e5bad288a4016864e1bf8730c3733f08a..626949662e8bcc76fa76e51b5e40fd5bf40d4f13
 
       # - name: Select verb
       #   id: select-verb
@@ -93,17 +93,17 @@ jobs:
               # PR body
               body=$(echo $gh_response | jq '.body')
               if [ -z "$body" ]; then body="UNDEFINED"; fi
-              body=$(echo "$body" | sed "s/'//")
+              body=$(echo "$body" | sed "s/'//" | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g')
               # PR Description
-              description=$(echo $body | awk -F "##" '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*jp>//g' | sed 's/Description//g' | sed 's/\\r\\n//g'| sed 's/<!--.*-->//g')
+              description=$(echo $body | awk -F "##" '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/\"Signed-off.*> //g' | sed 's/Description//g')
               if [ -z "$description" ]; then body="UNDEFINED"; fi
               if [[ "$body" =~ "Related links" ]]; then
                 # PR releated links
-                related_links=$(echo $body | awk -F "##" '{print $3}' | sed 's/Related links//g' | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g')
+                related_links=$(echo $body | awk -F "##" '{print $3}' | sed 's/Related links//g')
                 # PR test
-                test_performed=$(echo $body | awk -F "##" '{print $4}' | sed 's/Tests performed//g' | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g')
+                test_performed=$(echo $body | awk -F "##" '{print $4}' | sed 's/Tests performed//g')
                 # Note for PR reviewers
-                note_for_reviewers=$(echo $body | awk -F "##" '{print $5}' | sed 's/Notes for reviewers//g' | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g')
+                note_for_reviewers=$(echo $body | awk -F "##" '{print $5}' | sed 's/Notes for reviewers//g')
               fi
               if [ -z "$related_links" ]; then related_links="UNDEFINED"; fi
               if [ -z "$test_performed" ]; then test_performed="UNDEFINED"; fi
