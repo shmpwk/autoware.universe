@@ -55,8 +55,7 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          git-cliff-args: d434e87e5bad288a4016864e1bf8730c3733f08a..626949662e8bcc76fa76e51b5e40fd5bf40d4f13
-
+          git-cliff-args: 39780cb627be86c0fcde14e871ea60955f20d5ed..8d33e62f4243353d18e59e74b48dc804e1011424
       # - name: Select verb
       #   id: select-verb
       #   run: |
@@ -90,10 +89,13 @@ jobs:
                 gh_response=""
               fi
 
+              # PR author
+              author=$(echo $gh_response | jq '.user.login')
+
               # PR body
               body=$(echo $gh_response | jq '.body')
               if [ -z "$body" ]; then body="UNDEFINED"; fi
-              body=$(echo "$body" | sed "s/'//" | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g')
+              body=$(printf '%s' "$body" | sed "s/'//" | sed 's/\\r\\n/\\n/g' | sed 's/<!--.*-->//g')
               # PR Description
               description=$(echo $body | awk -F "##" '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/\"Signed-off.*> //g' | sed 's/Description//g')
               if [ -z "$description" ]; then body="UNDEFINED"; fi
@@ -110,27 +112,27 @@ jobs:
               if [ -z "$note_for_reviewers" ]; then note_for_reviewers="UNDEFINED"; fi
 
               # PR labels
-              labels=$(echo $gh_response | jq '.labels[].name')
+              labels=$(echo $gh_response | jq '.labels[].name' | sed 's/\"//g')
               if [ -z "$labels" ]; then labels="UNDEFINED"; fi
 
               bodies=$(jq -nc --arg url "$url" \
+                --arg author "$author" \
                 --arg description "$description" \
                 --arg related_links "$related_links" \
                 --arg test_performed "$test_performed"\
                 --arg note_for_reviewers "$note_for_reviewers"\
                 --arg labels "$labels"\
-                '{"labels": $labels, "url": $url, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
+                '{"labels": $labels, "url": $url, "author": $author, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
               bodies_array+=("$bodies")
             done
           done
           # id, tyoe, scope, title, author
-          jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message, author: .author.name})')
+          jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message})')
           array=$(echo "${bodies_array[@]}" | jq -cs .)
-          jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [0].author, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
+          jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
           echo ::set-output name=jdata::"$jqdatas"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
       - name: create json
         run: >
