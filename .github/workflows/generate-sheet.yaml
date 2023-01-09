@@ -18,6 +18,12 @@ on:
 
 jobs:
   generate-sheet:
+    environment: oidc
+
+    permissions:
+      contents: read
+      id-token: write
+
     runs-on: ubuntu-latest
     steps:
       - name: Set tag name
@@ -55,7 +61,7 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          git-cliff-args: 39780cb627be86c0fcde14e871ea60955f20d5ed..8d33e62f4243353d18e59e74b48dc804e1011424
+          git-cliff-args: f15689efe25d869211a8ce9140b0216982ad4cb1..HEAD
       # - name: Select verb
       #   id: select-verb
       #   run: |
@@ -75,7 +81,7 @@ jobs:
         id: arrange-json
         run: |
           r=$(cat context.json | jq .)
-          links=$(echo $r | jq -c '.[].commits | map({ link: .links[3].href})')
+          links=$(echo $r | jq -c '.[].commits | map({ link: .links[0].href})')
           bodies_array=()
           for link in $links; do
             for url in $(echo $link | jq -r '.[].link'); do
@@ -90,22 +96,27 @@ jobs:
               fi
 
               # PR author
-              author=$(echo $gh_response | jq '.user.login')
+              author=$(echo $gh_response | jq '.user.login' | sed 's/\"//g')
 
               # PR body
+              body=""
               body=$(echo $gh_response | jq '.body')
               if [ -z "$body" ]; then body="UNDEFINED"; fi
-              body=$(printf '%s' "$body" | sed "s/'//" | sed 's/\\r\\n/\\n/g' | sed 's/<!--.*-->//g')
+              body=$(printf '%s' "$body" | sed "s/'//g" | sed "s/\"//" | sed 's/\\r\\n\\r\\n/\\n/g' | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g' | sed 's/#\{3,\}/\\n/g')
               # PR Description
-              description=$(echo $body | awk -F "##" '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/\"Signed-off.*> //g' | sed 's/Description//g')
+              description=""
+              description=$(echo $body | awk -F "## " '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*>\\n//g' | sed 's/Description//g' | tac | sed 's/\\n//' | tac)
               if [ -z "$description" ]; then body="UNDEFINED"; fi
+              related_links=""
+              test_performed=""
+              note_for_reviewers=""
               if [[ "$body" =~ "Related links" ]]; then
                 # PR releated links
-                related_links=$(echo $body | awk -F "##" '{print $3}' | sed 's/Related links//g')
+                related_links=$(echo $body | awk -F "## " '{print $3}' | sed 's/Related links\\n//g' | tac | sed 's/\\n//' | tac)
                 # PR test
-                test_performed=$(echo $body | awk -F "##" '{print $4}' | sed 's/Tests performed//g')
+                test_performed=$(echo $body | awk -F "## " '{print $4}' | sed 's/Tests performed\\n//g' | tac | sed 's/\\n//' | tac)
                 # Note for PR reviewers
-                note_for_reviewers=$(echo $body | awk -F "##" '{print $5}' | sed 's/Notes for reviewers//g')
+                note_for_reviewers=$(echo $body | awk -F "## " '{print $5}' | sed 's/Notes for reviewers\\n//g' | tac | sed 's/\\n//' | tac)
               fi
               if [ -z "$related_links" ]; then related_links="UNDEFINED"; fi
               if [ -z "$test_performed" ]; then test_performed="UNDEFINED"; fi
@@ -134,15 +145,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: create json
-        run: >
-          curl -v "${{ secrets.EXEC_URL }}"
-          -H "Accept: application/json"
-          -H "Content-type: application/json"
-          -X POST
-          -w '\n'
-          -d '${{ steps.arrange-json.outputs.jdata }}'
+      # - name: create json
+      #   run: >
+      #     curl -v "${{ secrets.EXEC_URL }}"
+      #     -H "Accept: application/json"
+      #     -H "Content-type: application/json"
+      #     -X POST
+      #     -w '\n'
+      #     -d '${{ steps.arrange-json.outputs.jdata }}'
 
+      - name: update spread sheets and mention slack
+        uses: shmpwk/setup-spread-sheets@main
+        with:
+          release-spreadsheet-id: ${{ secrets.RELEASE_SPREADSHEET_ID }}
+          member-spreadsheet-id: ${{ secrets.MEMBER_SPREADSHEET_ID }}
+          slack-post-url: ${{ secrets.SLACK_POST_URL }}
+          pr-contents: '${{ steps.arrange-json.outputs.jdata }}'
+          workload-identity-provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service-account: ${{ secrets.SERVICE_ACCOUNT }}
       - name: Show relese note
         run: |
           echo $NOTES
