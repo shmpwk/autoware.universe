@@ -61,7 +61,8 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          git-cliff-args: f15689efe25d869211a8ce9140b0216982ad4cb1..HEAD
+          git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644
+          # git-cliff-args: f15689efe25d869211a8ce9140b0216982ad4cb1..HEAD
       # - name: Select verb
       #   id: select-verb
       #   run: |
@@ -90,37 +91,45 @@ jobs:
               if [ -z "$url" ]; then gh_url="UNDEFINED"; fi
               if [[ "$gh_url" != "null" ]]; then
                 echo $gh_url
-                gh_response=$(gh api -H "Accept: application/vnd.github+json" $gh_url)
+                gh_response=$(gh api -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28"  $gh_url)
+                list_reviewers_for_a_pr="https://api.github.com"$gh_url"/reviews"
+                curl_response=$(curl -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $list_reviewers_for_a_pr)
               else
                 gh_response=""
+                curl_response=""
               fi
 
               # PR author
               author=$(echo $gh_response | jq '.user.login' | sed 's/\"//g')
+              if [ -z "$author" ]; then author="UNDEFINED"; fi
 
               # PR body
               body=""
               body=$(echo $gh_response | jq '.body')
               if [ -z "$body" ]; then body="UNDEFINED"; fi
-              body=$(printf '%s' "$body" | sed "s/'//g" | sed "s/\"//" | sed 's/\\r\\n\\r\\n/\\n/g' | sed 's/\\r\\n//g' | sed 's/<!--.*-->//g' | sed 's/#\{3,\}/\\n/g')
+              body=$(printf '%s' "$body" | sed "s/'//g" | sed 's/\"//g' | sed 's/\\r\\n\\r\\n/\\n/g' | sed 's/\\r\\n//g' | sed 's/<!--[^>]*-->//g' | sed 's/#\{3,\}/\\n/g')
               # PR Description
               description=""
-              description=$(echo $body | awk -F "## " '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*>\\n//g' | sed 's/Description//g' | tac | sed 's/\\n//' | tac)
-              if [ -z "$description" ]; then body="UNDEFINED"; fi
+              description=$(echo $body | awk -F "## " '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*?>\\n//g' | sed 's/Description//' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
+              if [ -z "$description" || "$description" == " " || "$description" == "\\n" || "$description" == " \\n" ]; then description="UNDEFINED"; fi
               related_links=""
               test_performed=""
               note_for_reviewers=""
               if [[ "$body" =~ "Related links" ]]; then
                 # PR releated links
-                related_links=$(echo $body | awk -F "## " '{print $3}' | sed 's/Related links\\n//g' | tac | sed 's/\\n//' | tac)
+                related_links=$(echo $body | awk -F "## " '{print $3}' | sed 's/Related links//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
                 # PR test
-                test_performed=$(echo $body | awk -F "## " '{print $4}' | sed 's/Tests performed\\n//g' | tac | sed 's/\\n//' | tac)
+                test_performed=$(echo $body | awk -F "## " '{print $4}' | sed 's/Tests performed//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
                 # Note for PR reviewers
-                note_for_reviewers=$(echo $body | awk -F "## " '{print $5}' | sed 's/Notes for reviewers\\n//g' | tac | sed 's/\\n//' | tac)
+                note_for_reviewers=$(echo $body | awk -F "## " '{print $5}' | sed 's/Notes for reviewers//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
               fi
               if [ -z "$related_links" ]; then related_links="UNDEFINED"; fi
               if [ -z "$test_performed" ]; then test_performed="UNDEFINED"; fi
               if [ -z "$note_for_reviewers" ]; then note_for_reviewers="UNDEFINED"; fi
+
+              # PR review approvers
+              approver=$(echo $curl_response | jq '.[] | select (.state?=="APPROVED")' | jq '.user.login' | sed 's/\"//g')
+              if [ -z "$approver" ]; then approver="shmpwk"; fi
 
               # PR labels
               labels=$(echo $gh_response | jq '.labels[].name' | sed 's/\"//g')
@@ -128,22 +137,23 @@ jobs:
 
               bodies=$(jq -nc --arg url "$url" \
                 --arg author "$author" \
+                --arg approver "$approver" \
                 --arg description "$description" \
                 --arg related_links "$related_links" \
-                --arg test_performed "$test_performed"\
-                --arg note_for_reviewers "$note_for_reviewers"\
-                --arg labels "$labels"\
-                '{"labels": $labels, "url": $url, "author": $author, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
+                --arg test_performed "$test_performed" \
+                --arg note_for_reviewers "$note_for_reviewers" \
+                --arg labels "$labels" \
+                '{"labels": $labels, "url": $url, "author": $author, "approver": $approver, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
               bodies_array+=("$bodies")
             done
           done
           # id, tyoe, scope, title, author
           jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message})')
           array=$(echo "${bodies_array[@]}" | jq -cs .)
-          jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
+          jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, approver: .[1].approver, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
           echo ::set-output name=jdata::"$jqdatas"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       # - name: create json
       #   run: >
@@ -163,9 +173,11 @@ jobs:
           pr-contents: '${{ steps.arrange-json.outputs.jdata }}'
           workload-identity-provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
           service-account: ${{ secrets.SERVICE_ACCOUNT }}
+          enable-overwrite: true
+          sheet-name: v0.6.0
       - name: Show relese note
         run: |
           echo $NOTES
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           NOTES: ${{ steps.arrange-json.outputs.jdata }}
