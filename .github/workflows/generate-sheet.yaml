@@ -81,72 +81,72 @@ jobs:
       - name: Arrange json data
         id: arrange-json
         run: |
-          r=$(cat context.json | jq .)
-          #links=$(echo $r | jq -c '.[].commits | map({ link: .links[0].href})')
-          links=$(echo $r | jq -c '.[].link')
+          r=$(jq . context.json)
+          sleep 5
+          echo $r
           bodies_array=()
-          for link in $links; do
-            for url in $(echo $link | jq -r '.[].link'); do
-              # PR url
-              gh_url=$(echo $url | sed 's/https:\/\/github.com/\/repos/g' | sed 's/pull/pulls/g')
-              if [ -z "$url" ]; then gh_url="UNDEFINED"; fi
-              if [[ "$gh_url" != "null" ]]; then
-                echo $gh_url
-                gh_response=$(gh api -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28"  $gh_url)
-                list_reviewers_for_a_pr="https://api.github.com"$gh_url"/reviews"
-                curl_response=$(curl -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $list_reviewers_for_a_pr)
-              else
-                gh_response=""
-                curl_response=""
-              fi
+          for url in $(echo $r | jq -r '.[].link // empty'); do
+            sleep 3
+            echo $url
+            # PR url
+            gh_url=$(echo $url | sed 's/https:\/\/github.com/\/repos/g' | sed 's/pull/pulls/g')
+            if [ -z "$url" ]; then gh_url="UNDEFINED"; fi
+            if [[ "$gh_url" != "null" ]]; then
+              echo $gh_url
+              gh_response=$(gh api -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28"  $gh_url)
+              list_reviewers_for_a_pr="https://api.github.com"$gh_url"/reviews"
+              curl_response=$(curl -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $list_reviewers_for_a_pr)
+            else
+              gh_response=""
+              curl_response=""
+            fi
 
-              # PR author
-              author=$(echo $gh_response | jq '.user.login' | sed 's/\"//g')
-              if [ -z "$author" ]; then author="UNDEFINED"; fi
+            # PR author
+            author=$(echo $gh_response | jq '.user.login' | sed 's/\"//g')
+            if [ -z "$author" ]; then author="UNDEFINED"; fi
 
-              # PR body
-              body=""
-              body=$(echo $gh_response | jq '.body')
-              if [ -z "$body" ]; then body="UNDEFINED"; fi
-              body=$(printf '%s' "$body" | sed "s/'//g" | sed 's/\"//g' | sed 's/\\r\\n\\r\\n/\\n/g' | sed 's/\\r\\n//g' | sed 's/<!--[^>]*-->//g' | sed 's/#\{3,\}/\\n/g')
-              # PR Description
-              description=""
-              description=$(echo $body | awk -F "## " '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*?>\\n//g' | sed 's/Description//' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
-              if [ -z "$description" || "$description" == " " || "$description" == "\\n" || "$description" == " \\n" ]; then description="UNDEFINED"; fi
-              related_links=""
-              test_performed=""
-              note_for_reviewers=""
-              if [[ "$body" =~ "Related links" ]]; then
-                # PR releated links
-                related_links=$(echo $body | awk -F "## " '{print $3}' | sed 's/Related links//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
-                # PR test
-                test_performed=$(echo $body | awk -F "## " '{print $4}' | sed 's/Tests performed//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
-                # Note for PR reviewers
-                note_for_reviewers=$(echo $body | awk -F "## " '{print $5}' | sed 's/Notes for reviewers//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
-              fi
-              if [ -z "$related_links" ]; then related_links="UNDEFINED"; fi
-              if [ -z "$test_performed" ]; then test_performed="UNDEFINED"; fi
-              if [ -z "$note_for_reviewers" ]; then note_for_reviewers="UNDEFINED"; fi
+            # PR body
+            body=""
+            body=$(echo $gh_response | jq '.body')
+            if [ -z "$body" ]; then body="UNDEFINED"; fi
+            body=$(printf '%s' "$body" | sed "s/'//g" | sed 's/\"//g' | sed 's/\\r\\n\\r\\n/\\n/g' | sed 's/\\r\\n//g' | sed 's/<!--[^>]*-->//g' | sed 's/#\{3,\}/\\n/g')
+            # PR Description
+            description=""
+            description=$(echo $body | awk -F "## " '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*?>\\n//g' | sed 's/Description//' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
+            if [ -z "$description" || "$description" == " " || "$description" == "\\n" || "$description" == " \\n" ]; then description="UNDEFINED"; fi
+            related_links=""
+            test_performed=""
+            note_for_reviewers=""
+            if [[ "$body" =~ "Related links" ]]; then
+              # PR releated links
+              related_links=$(echo $body | awk -F "## " '{print $3}' | sed 's/Related links//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
+              # PR test
+              test_performed=$(echo $body | awk -F "## " '{print $4}' | sed 's/Tests performed//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
+              # Note for PR reviewers
+              note_for_reviewers=$(echo $body | awk -F "## " '{print $5}' | sed 's/Notes for reviewers//g' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
+            fi
+            if [ -z "$related_links" ]; then related_links="UNDEFINED"; fi
+            if [ -z "$test_performed" ]; then test_performed="UNDEFINED"; fi
+            if [ -z "$note_for_reviewers" ]; then note_for_reviewers="UNDEFINED"; fi
 
-              # PR review approvers
-              approver=$(echo $curl_response | jq '.[] | select (.state?=="APPROVED")' | jq '.user.login' | sed 's/\"//g')
-              if [ -z "$approver" ]; then approver="shmpwk"; fi
+            # PR review approvers
+            approver=$(echo $curl_response | jq '.[] | select (.state?=="APPROVED")' | jq '.user.login' | sed 's/\"//g')
+            if [ -z "$approver" ]; then approver="shmpwk"; fi
 
-              # PR labels
-              labels=$(echo $gh_response | jq '.labels[].name' | sed 's/\"//g')
-              if [ -z "$labels" ]; then labels="UNDEFINED"; fi
+            # PR labels
+            labels=$(echo $gh_response | jq '.labels[].name' | sed 's/\"//g')
+            if [ -z "$labels" ]; then labels="UNDEFINED"; fi
 
-              bodies=$(jq -nc --arg url "$url" \
-                --arg author "$author" \
-                --arg approver "$approver" \
-                --arg description "$description" \
-                --arg related_links "$related_links" \
-                --arg test_performed "$test_performed" \
-                --arg note_for_reviewers "$note_for_reviewers" \
-                --arg labels "$labels" \
-                '{"labels": $labels, "url": $url, "author": $author, "approver": $approver, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
-              bodies_array+=("$bodies")
-            done
+            bodies=$(jq -nc --arg url "$url" \
+              --arg author "$author" \
+              --arg approver "$approver" \
+              --arg description "$description" \
+              --arg related_links "$related_links" \
+              --arg test_performed "$test_performed" \
+              --arg note_for_reviewers "$note_for_reviewers" \
+              --arg labels "$labels" \
+              '{"labels": $labels, "url": $url, "author": $author, "approver": $approver, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
+            bodies_array+=("$bodies")
           done
           # id, tyoe, scope, title, author
           #jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message})')
