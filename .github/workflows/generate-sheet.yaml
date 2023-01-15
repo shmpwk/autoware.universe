@@ -82,7 +82,8 @@ jobs:
         id: arrange-json
         run: |
           r=$(cat context.json | jq .)
-          links=$(echo $r | jq -c '.[].commits | map({ link: .links[0].href})')
+          #links=$(echo $r | jq -c '.[].commits | map({ link: .links[0].href})')
+          links=$(echo $r | jq -c '.[].link')
           bodies_array=()
           for link in $links; do
             for url in $(echo $link | jq -r '.[].link'); do
@@ -148,7 +149,8 @@ jobs:
             done
           done
           # id, tyoe, scope, title, author
-          jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message})')
+          #jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message})')
+          jqdata=$(echo $r)
           array=$(echo "${bodies_array[@]}" | jq -cs .)
           jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, approver: .[1].approver, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
           echo ::set-output name=jdata::"$jqdatas"
@@ -170,7 +172,7 @@ jobs:
           release-spreadsheet-id: ${{ secrets.RELEASE_SPREADSHEET_ID }}
           member-spreadsheet-id: ${{ secrets.MEMBER_SPREADSHEET_ID }}
           slack-post-url: ${{ secrets.SLACK_POST_URL }}
-          pr-contents: '${{ steps.arrange-json.outputs.jdata }}'
+          pr-contents: ${{ steps.arrange-json.outputs.jdata }}
           workload-identity-provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
           service-account: ${{ secrets.SERVICE_ACCOUNT }}
           enable-overwrite: true
