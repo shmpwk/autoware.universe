@@ -61,7 +61,8 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644
+          # git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644
+          git-cliff-args: 9f4c833c586f578b38f49b31e289e25092efa327..6abed14d026866bb70b9516eb35f04e5de7ec644
           # git-cliff-args: f15689efe25d869211a8ce9140b0216982ad4cb1..HEAD
       # - name: Select verb
       #   id: select-verb
@@ -81,22 +82,26 @@ jobs:
       - name: Arrange json data
         id: arrange-json
         run: |
-          r=$(jq . context.json)
-          sleep 5
-          echo $r
-          bodies_array=()
-          for url in $(echo $r | jq -r '.[].link // empty'); do
-            sleep 3
-            echo $url
+          # jqdata=$(jq . context.json)
+          body_array=()
+          # emit empty link
+          # for cliff_data in $(echo $jqdata | jq -r '.[].link'); do
+          # IFS=$'\n' read -rd '' -a pipe_data <<< "$pipe"
+          # for cliff_data in "${pipe_data[@]}"; do
+          while read cliff_data; do
+            url=$(echo $cliff_data | jq -r '.link')
             # PR url
             gh_url=$(echo $url | sed 's/https:\/\/github.com/\/repos/g' | sed 's/pull/pulls/g')
-            if [ -z "$url" ]; then gh_url="UNDEFINED"; fi
-            if [[ "$gh_url" != "null" ]]; then
+            if [[ -n "$gh_url" && "$gh_url" != "[]" ]]; then
               echo $gh_url
-              gh_response=$(gh api -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28"  $gh_url)
-              list_reviewers_for_a_pr="https://api.github.com"$gh_url"/reviews"
+              # if [[ "$gh_url" != "[]" ]]; then
+              gh_response=$(gh api -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $gh_url)
+              list_reviewers_for_a_pr="https://api.github.com$gh_url/reviews"
               curl_response=$(curl -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $list_reviewers_for_a_pr)
             else
+              echo "empty link"
+              gh_url="UNDEFINED"
+              url="UNDEFINED"
               gh_response=""
               curl_response=""
             fi
@@ -113,7 +118,7 @@ jobs:
             # PR Description
             description=""
             description=$(echo $body | awk -F "## " '{print $1, $2}' | sed 's/'\''//g' | sed -r 's/Signed-off.*?>\\n//g' | sed 's/Description//' | sed 's/\\n//' | tac | sed 's/\\n//' | tac)
-            if [ -z "$description" || "$description" == " " || "$description" == "\\n" || "$description" == " \\n" ]; then description="UNDEFINED"; fi
+            if [[ -z "$description" || "$description" == " " || "$description" == "\\n" || "$description" == " \\n" ]]; then description="UNDEFINED"; fi
             related_links=""
             test_performed=""
             note_for_reviewers=""
@@ -137,23 +142,41 @@ jobs:
             labels=$(echo $gh_response | jq '.labels[].name' | sed 's/\"//g')
             if [ -z "$labels" ]; then labels="UNDEFINED"; fi
 
-            bodies=$(jq -nc --arg url "$url" \
+            # id
+            id=$(echo $cliff_data | jq -r '.id')
+            if [ -z "$id" ]; then id="UNDEFINED"; fi
+
+            # type
+            type=$(echo $cliff_data | jq -r '.type')
+            if [ -z "$type" ]; then type="UNDEFINED"; fi
+
+            # title
+            title=$(echo $cliff_data | jq -r '.title')
+            if [ -z "$title" ]; then title="UNDEFINED"; fi
+
+            body_arranged=$(jq -nc \
+              --arg id "$id" \
+              --arg type "$type" \
+              --arg scope "$scope" \
+              --arg title "$title" \
+              --arg labels "$labels" \
+              --arg url "$url" \
               --arg author "$author" \
               --arg approver "$approver" \
               --arg description "$description" \
               --arg related_links "$related_links" \
               --arg test_performed "$test_performed" \
               --arg note_for_reviewers "$note_for_reviewers" \
-              --arg labels "$labels" \
-              '{"labels": $labels, "url": $url, "author": $author, "approver": $approver, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
-            bodies_array+=("$bodies")
-          done
+              '{"id": $id, "type": $type, "scope": $scope, "title": $title, "labels": $labels, "url": $url, "author": $author, "approver": $approver, "description": $description, "related_links": $related_links, "test_performed": $test_performed, "note_for_reviewers": $note_for_reviewers}')
+            body_array+=("$body_arranged")
+          done < <(jq -cr '.[]' context.json)
+          json_array=$(printf "%s\n" "${body_array[@]}" | jq -sc '.')
+          echo $json_array
           # id, tyoe, scope, title, author
-          #jqdata=$(echo $r | jq .[].commits | jq .[] | jq -s . | jq 'map({id: .id, type: .group, scope: .scope, title: .message})')
-          jqdata=$(echo $r)
-          array=$(echo "${bodies_array[@]}" | jq -cs .)
-          jqdatas=$(jq -nc '[$jqdata, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, approver: .[1].approver, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson jqdata "$jqdata" --argjson bodies_array "$array")
-          echo ::set-output name=jdata::"$jqdatas"
+          # array=$(echo "${bodies_array[@]}" | jq -cs .)
+          # jqdatas=$(jq -nc '[$cliff_data, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, approver: .[1].approver, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson cliff_data "$cliff_data" --argjson bodies_array "$array")
+          # echo ::set-output name=jdata::"$jqdatas"
+          echo ::set-output name=jdata::"$json_array"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
@@ -176,7 +199,7 @@ jobs:
           workload-identity-provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
           service-account: ${{ secrets.SERVICE_ACCOUNT }}
           enable-overwrite: true
-          sheet-name: v0.6.0
+          sheet-name: test
       - name: Show relese note
         run: |
           echo $NOTES
