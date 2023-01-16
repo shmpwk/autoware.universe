@@ -61,7 +61,7 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          # git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644
+          # git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644 #short version
           git-cliff-args: 9f4c833c586f578b38f49b31e289e25092efa327..6abed14d026866bb70b9516eb35f04e5de7ec644
           # git-cliff-args: f15689efe25d869211a8ce9140b0216982ad4cb1..HEAD
       # - name: Select verb
@@ -84,17 +84,11 @@ jobs:
         run: |
           # jqdata=$(jq . context.json)
           body_array=()
-          # emit empty link
-          # for cliff_data in $(echo $jqdata | jq -r '.[].link'); do
-          # IFS=$'\n' read -rd '' -a pipe_data <<< "$pipe"
-          # for cliff_data in "${pipe_data[@]}"; do
           while read cliff_data; do
             url=$(echo $cliff_data | jq -r '.link')
             # PR url
             gh_url=$(echo $url | sed 's/https:\/\/github.com/\/repos/g' | sed 's/pull/pulls/g')
             if [[ -n "$gh_url" && "$gh_url" != "[]" ]]; then
-              echo $gh_url
-              # if [[ "$gh_url" != "[]" ]]; then
               gh_response=$(gh api -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $gh_url)
               list_reviewers_for_a_pr="https://api.github.com$gh_url/reviews"
               curl_response=$(curl -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.GH_TOKEN }}" -H "X-GitHub-Api-Version: 2022-11-28" $list_reviewers_for_a_pr)
@@ -172,10 +166,6 @@ jobs:
           done < <(jq -cr '.[]' context.json)
           json_array=$(printf "%s\n" "${body_array[@]}" | jq -sc '.')
           echo $json_array
-          # id, tyoe, scope, title, author
-          # array=$(echo "${bodies_array[@]}" | jq -cs .)
-          # jqdatas=$(jq -nc '[$cliff_data, $bodies_array] | transpose | map({id: .[0].id, type: .[0].type, scope: .[0].scope, title: .[0].title, labels: .[1].labels, url: .[1].url, author:. [1].author, approver: .[1].approver, description: .[1].description, related_links: .[1].related_links, test_performed: .[1].test_performed, note_for_reviewers: .[1].note_for_reviewers})' --argjson cliff_data "$cliff_data" --argjson bodies_array "$array")
-          # echo ::set-output name=jdata::"$jqdatas"
           echo ::set-output name=jdata::"$json_array"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
