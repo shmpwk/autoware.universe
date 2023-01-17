@@ -170,14 +170,19 @@ jobs:
             body_array+=("$body_arranged")
           done < <(jq -cr '.[]' context.json)
           json_array=$(printf "%s\n" "${body_array[@]}" | jq -sc '.')
-          printf "%s\n" "${body_array[@]}" | jq -sc '.' > ./${GITHUB_ACTION_PATH}/../../../pr_jarray.json
-          echo "+++++++++++++++++++++++++++++++++++++++++++++"
-          tree ./${GITHUB_ACTION_PATH}/../../../ -L 3
-          echo "+++++++++++++++++++++++++++++++++++++++++++++"
-          ls  ../../../
+          printf "%s\n" "${body_array[@]}" | jq -sc '.' > ./pr_jarray.json
           echo ::set-output name=jdata::"$json_array"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+      - name: Upload to gdrive
+        uses: mathisve/gdrive-upload-action@main
+        with:
+          filename: pr_jarray.json
+          name: pr_jarray.json
+          folderId: 1M7qHT-8Mt-8_oPIwY8VlJtqN_1WoV354
+          credentials: ${{ secrets.CREDENTIALS }}
+          encoded: false
 
       # - name: create json
       #   run: >
