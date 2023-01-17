@@ -61,8 +61,8 @@ jobs:
         uses: shmpwk/autoware-github-actions/generate-changelog@dev
         with:
           save-json-output: true
-          # git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644 #short version
-          git-cliff-args: 9f4c833c586f578b38f49b31e289e25092efa327..6abed14d026866bb70b9516eb35f04e5de7ec644
+          git-cliff-args: 653305845a0937326064c750754bd52d20911097..6abed14d026866bb70b9516eb35f04e5de7ec644 # short version
+          # git-cliff-args: 9f4c833c586f578b38f49b31e289e25092efa327..6abed14d026866bb70b9516eb35f04e5de7ec644 # long version
           # git-cliff-args: f15689efe25d869211a8ce9140b0216982ad4cb1..HEAD
       # - name: Select verb
       #   id: select-verb
@@ -129,22 +129,27 @@ jobs:
             if [ -z "$note_for_reviewers" ]; then note_for_reviewers="UNDEFINED"; fi
 
             # PR review approvers
+            approver=""
             approver=$(echo $curl_response | jq '.[] | select (.state?=="APPROVED")' | jq '.user.login' | sed 's/\"//g')
             if [ -z "$approver" ]; then approver="shmpwk"; fi
 
             # PR labels
+            labels=""
             labels=$(echo $gh_response | jq '.labels[].name' | sed 's/\"//g')
             if [ -z "$labels" ]; then labels="UNDEFINED"; fi
 
             # id
+            id=""
             id=$(echo $cliff_data | jq -r '.id')
             if [ -z "$id" ]; then id="UNDEFINED"; fi
 
             # type
+            type=""
             type=$(echo $cliff_data | jq -r '.type')
             if [ -z "$type" ]; then type="UNDEFINED"; fi
 
             # title
+            title=""
             title=$(echo $cliff_data | jq -r '.title')
             if [ -z "$title" ]; then title="UNDEFINED"; fi
 
@@ -165,7 +170,10 @@ jobs:
             body_array+=("$body_arranged")
           done < <(jq -cr '.[]' context.json)
           json_array=$(printf "%s\n" "${body_array[@]}" | jq -sc '.')
-          echo $json_array
+          printf "%s\n" "${body_array[@]}" | jq -sc '.' > ./${GITHUB_ACTION_PATH}/pr_jarray.json
+          echo "+++++++++++++++++++++++++++++++++++++++++++++"
+          ls
+          pwd
           echo ::set-output name=jdata::"$json_array"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
@@ -180,19 +188,18 @@ jobs:
       #     -d '${{ steps.arrange-json.outputs.jdata }}'
 
       - name: update spread sheets and mention slack
-        uses: shmpwk/setup-spread-sheets@main
+        uses: shmpwk/setup-spread-sheets@feat/no-pr-input
         with:
           release-spreadsheet-id: ${{ secrets.RELEASE_SPREADSHEET_ID }}
           member-spreadsheet-id: ${{ secrets.MEMBER_SPREADSHEET_ID }}
           slack-post-url: ${{ secrets.SLACK_POST_URL }}
-          pr-contents: ${{ steps.arrange-json.outputs.jdata }}
           workload-identity-provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
           service-account: ${{ secrets.SERVICE_ACCOUNT }}
           enable-overwrite: true
           sheet-name: test
-      - name: Show relese note
-        run: |
-          echo $NOTES
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          NOTES: ${{ steps.arrange-json.outputs.jdata }}
+      #  - name: Show relese note
+      #    run: |
+      #      echo $NOTES
+      #    env:
+      #      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      #      NOTES: ${{ steps.arrange-json.outputs.jdata }}
