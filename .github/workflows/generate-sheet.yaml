@@ -170,10 +170,11 @@ jobs:
             body_array+=("$body_arranged")
           done < <(jq -cr '.[]' context.json)
           json_array=$(printf "%s\n" "${body_array[@]}" | jq -sc '.')
-          printf "%s\n" "${body_array[@]}" | jq -sc '.' > ./${GITHUB_ACTION_PATH}/pr_jarray.json
+          printf "%s\n" "${body_array[@]}" | jq -sc '.' > ./${GITHUB_ACTION_PATH}/../../../pr_jarray.json
           echo "+++++++++++++++++++++++++++++++++++++++++++++"
-          ls
-          pwd
+          tree ./${GITHUB_ACTION_PATH}/../../../ -L 3
+          echo "+++++++++++++++++++++++++++++++++++++++++++++"
+          ls  ../../../
           echo ::set-output name=jdata::"$json_array"
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
