@@ -15,6 +15,10 @@ on:
         description: The name of the branch to write spread sheet
         type: string
         required: false
+    sheet-name:
+      description: The name of spread sheet
+      type: string
+      required: false
 
 jobs:
   generate-sheet:
@@ -52,9 +56,13 @@ jobs:
       #         "${{ steps.set-tag-name.outputs.ref-name }}"
       #     fi
 
-      - name: Create a local tag for beta branches
-        run: |
-          git tag "v0.6.0"
+      # - name: Create a local tag for beta branches
+      #   run: |
+      #     git tag "v0.6.0"
+
+      # - name: Reffer some latest commits
+      #   run: |
+      #    git log --pretty=%H -10
 
       - name: Run generate-changelog
         id: generate-changelog
@@ -176,22 +184,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Upload to gdrive
-        uses: mathisve/gdrive-upload-action@main
+        uses: adityak74/google-drive-upload-git-action@v0.3
         with:
           filename: pr_jarray.json
           name: pr_jarray.json
           folderId: 1M7qHT-8Mt-8_oPIwY8VlJtqN_1WoV354
           credentials: ${{ secrets.CREDENTIALS }}
-          encoded: false
-
-      # - name: create json
-      #   run: >
-      #     curl -v "${{ secrets.EXEC_URL }}"
-      #     -H "Accept: application/json"
-      #     -H "Content-type: application/json"
-      #     -X POST
-      #     -w '\n'
-      #     -d '${{ steps.arrange-json.outputs.jdata }}'
+          overwrite: true
 
       - name: update spread sheets and mention slack
         uses: shmpwk/setup-spread-sheets@feat/no-pr-input
@@ -203,9 +202,3 @@ jobs:
           service-account: ${{ secrets.SERVICE_ACCOUNT }}
           enable-overwrite: true
           sheet-name: test
-      #  - name: Show relese note
-      #    run: |
-      #      echo $NOTES
-      #    env:
-      #      GH_TOKEN: ${{ secrets.GH_TOKEN }}
-      #      NOTES: ${{ steps.arrange-json.outputs.jdata }}
