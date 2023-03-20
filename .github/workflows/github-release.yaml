@@ -47,6 +47,7 @@ jobs:
           if [ "${{ steps.set-target-name.outputs.target-name }}" != "" ]; then
             git tag "${{ steps.set-tag-name.outputs.tag-name }}"
           fi
+          git tag -n
 
       - name: Run generate-changelog
         id: generate-changelog
