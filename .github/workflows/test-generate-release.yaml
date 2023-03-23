@@ -1,0 +1,55 @@
+name: test-generate-sheet
+
+inputs:
+  ref-name:
+    required: true
+  cliff-toml:
+    required: false
+    default: cliff.toml
+
+runs:
+  using: composite
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@v3
+
+    - name: Set tag name
+      id: set-tag-name
+      shell: bash
+      run: |
+        REF_NAME="${{ inputs.ref-name }}"
+        echo ::set-output name=ref-name::"$REF_NAME"
+        echo ::set-output name=tag-name::"${REF_NAME#beta/}"
+    - name: Create Environment
+      id: create-cliff-args
+      shell: bash
+      run: |
+        # clone and vcs import repo
+        sudo pip install vcstool
+        # cd "${GITHUB_ACTION_PATH}"
+        # git clone https://${GH_TOKEN}git@github.com/autowarefoundation/autoware.git
+        # wget https://raw.githubusercontent.com/autowarefoundation/autoware/main/autoware.repos
+        # cd autoware
+        # mkdir src
+        # vcs import src < autoware.repos
+        git checkout ${{ steps.set-tag-name.outputs.ref-name }}
+    - name: Set target name for beta branches
+      id: set-target-name
+      shell: bash
+      run: |
+        if [[ "${{ steps.set-tag-name.outputs.ref-name }}" =~ "beta/" ]]; then
+          echo ::set-output name=target-name::"${{ steps.set-tag-name.outputs.ref-name }}"
+        fi
+    - name: Create a local tag for beta branches
+      shell: bash
+      run: |
+        cd "${GITHUB_ACTION_PATH}"/autoware.universe
+        if [ "${{ steps.set-target-name.outputs.target-name }}" != "" ]; then
+          git tag "${{ steps.set-tag-name.outputs.tag-name }}"
+        fi
+    - name: Run generate-changelog
+      id: generate-changelog
+      uses: shmpwk/autoware-github-actions/generate-changelog@dev
+      with:
+        save-json-output: true
+        git-cliff-config: "${{ inputs.cliff-toml }}"
