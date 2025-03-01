@@ -69,6 +69,7 @@ public:
     double stop_margin;
     double tl_state_timeout;
     double yellow_lamp_period;
+    double yellow_light_stop_velocity;
     double stop_time_hysteresis;
     bool enable_pass_judge;
     // V2I Parameter
@@ -83,9 +84,7 @@ public:
     const int64_t lane_id, const lanelet::TrafficLight & traffic_light_reg_elem,
     lanelet::ConstLanelet lane, const PlannerParam & planner_param, const rclcpp::Logger logger,
     const rclcpp::Clock::SharedPtr clock,
-    const std::shared_ptr<universe_utils::TimeKeeper> time_keeper,
-    const std::function<std::optional<TrafficSignalTimeToRedStamped>(void)> &
-      get_rest_time_to_red_signal,
+    const std::shared_ptr<autoware_utils::TimeKeeper> time_keeper,
     const std::shared_ptr<planning_factor_interface::PlanningFactorInterface>
       planning_factor_interface);
 

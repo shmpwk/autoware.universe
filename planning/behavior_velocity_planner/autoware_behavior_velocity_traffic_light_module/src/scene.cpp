@@ -48,9 +48,7 @@ TrafficLightModule::TrafficLightModule(
   const int64_t lane_id, const lanelet::TrafficLight & traffic_light_reg_elem,
   lanelet::ConstLanelet lane, const PlannerParam & planner_param, const rclcpp::Logger logger,
   const rclcpp::Clock::SharedPtr clock,
-  const std::shared_ptr<universe_utils::TimeKeeper> time_keeper,
-  const std::function<std::optional<TrafficSignalTimeToRedStamped>(void)> &
-    get_rest_time_to_red_signal,
+  const std::shared_ptr<autoware_utils::TimeKeeper> time_keeper,
   const std::shared_ptr<planning_factor_interface::PlanningFactorInterface>
     planning_factor_interface)
 : SceneModuleInterfaceWithRTC(lane_id, logger, clock, time_keeper, planning_factor_interface),
@@ -233,7 +231,8 @@ bool TrafficLightModule::isPassthrough(const double & signed_arc_length) const
     delay_response_time);
 
   const bool distance_stoppable = pass_judge_line_distance < signed_arc_length;
-  const bool slow_velocity = planner_data_->current_velocity->twist.linear.x < 1.0;
+  const bool slow_velocity =
+    planner_data_->current_velocity->twist.linear.x < planner_param_.yellow_light_stop_velocity;
   const bool stoppable = distance_stoppable || slow_velocity;
   const bool reachable = signed_arc_length < reachable_distance;
 

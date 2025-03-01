@@ -24,10 +24,10 @@
 #include "autoware/behavior_path_static_obstacle_avoidance_module/debug.hpp"
 #include "autoware/behavior_path_static_obstacle_avoidance_module/utils.hpp"
 
-#include <autoware/universe_utils/geometry/geometry.hpp>
-#include <autoware/universe_utils/system/time_keeper.hpp>
 #include <autoware_lanelet2_extension/utility/message_conversion.hpp>
 #include <autoware_lanelet2_extension/utility/utilities.hpp>
+#include <autoware_utils/geometry/geometry.hpp>
+#include <autoware_utils/system/time_keeper.hpp>
 
 #include <algorithm>
 #include <limits>
@@ -186,7 +186,8 @@ bool StaticObstacleAvoidanceModule::canTransitSuccessState()
 
     constexpr double THRESHOLD = 1.0;
     const auto is_further_than_threshold =
-      calcDistance2d(getEgoPose(), getPose(data.reference_path.points.back())) > THRESHOLD;
+      calc_distance2d(getEgoPose(), autoware_utils::get_pose(data.reference_path.points.back())) >
+      THRESHOLD;
     if (is_further_than_threshold && arrived_path_end_) {
       RCLCPP_WARN(getLogger(), "Reach path end point. Exit.");
       return true;
@@ -199,13 +200,7 @@ bool StaticObstacleAvoidanceModule::canTransitSuccessState()
 void StaticObstacleAvoidanceModule::fillFundamentalData(
   AvoidancePlanningData & data, DebugData & debug)
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
-  
-  if (getPreviousModuleOutput().reference_path.points.empty()) {
-    RCLCPP_WARN_THROTTLE(getLogger(), *clock_, 5000, "Previous module reference path is empty. Skip processing.");
-    return;
-  }
-
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   // reference pose
   data.reference_pose =
     utils::getUnshiftedEgoPose(getEgoPose(), helper_->getPreviousSplineShiftPath());
@@ -338,7 +333,7 @@ void StaticObstacleAvoidanceModule::fillFundamentalData(
 void StaticObstacleAvoidanceModule::fillAvoidanceTargetObjects(
   AvoidancePlanningData & data, DebugData & debug) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   using utils::static_obstacle_avoidance::filterTargetObjects;
   using utils::static_obstacle_avoidance::separateObjectsByPath;
   using utils::static_obstacle_avoidance::updateRoadShoulderDistance;
@@ -378,7 +373,7 @@ void StaticObstacleAvoidanceModule::fillAvoidanceTargetObjects(
     std::vector<AvoidanceDebugMsg> debug_info_array;
     const auto append = [&](const auto & o) {
       AvoidanceDebugMsg debug_info;
-      debug_info.object_id = toHexString(o.object.object_id);
+      debug_info.object_id = to_hex_string(o.object.object_id);
       debug_info.longitudinal_distance = o.longitudinal;
       debug_info.lateral_distance_from_centerline = o.to_centerline;
       debug_info_array.push_back(debug_info);
@@ -392,7 +387,7 @@ void StaticObstacleAvoidanceModule::fillAvoidanceTargetObjects(
 
 void StaticObstacleAvoidanceModule::fillAvoidanceTargetData(ObjectDataArray & objects) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   using utils::static_obstacle_avoidance::fillAvoidanceNecessity;
   using utils::static_obstacle_avoidance::fillObjectStoppableJudge;
 
@@ -409,7 +404,7 @@ void StaticObstacleAvoidanceModule::fillAvoidanceTargetData(ObjectDataArray & ob
 ObjectData StaticObstacleAvoidanceModule::createObjectData(
   const AvoidancePlanningData & data, const PredictedObject & object) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   using boost::geometry::return_centroid;
 
   const auto & path_points = data.reference_path.points;
@@ -427,7 +422,7 @@ ObjectData StaticObstacleAvoidanceModule::createObjectData(
   const auto lower = parameters_->lower_distance_for_polygon_expansion;
   const auto upper = parameters_->upper_distance_for_polygon_expansion;
   const auto clamp =
-    std::clamp(calcDistance2d(getEgoPose(), object_pose) - lower, 0.0, upper) / upper;
+    std::clamp(calc_distance2d(getEgoPose(), object_pose) - lower, 0.0, upper) / upper;
   object_data.distance_factor = object_parameter.max_expand_ratio * clamp + 1.0;
 
   // Calc envelop polygon.
@@ -442,7 +437,7 @@ ObjectData StaticObstacleAvoidanceModule::createObjectData(
     object_data, stopped_objects_, parameters_);
 
   // Calc lateral deviation from path to target object.
-  object_data.direction = calcLateralDeviation(object_closest_pose, object_pose.position) > 0.0
+  object_data.direction = calc_lateral_deviation(object_closest_pose, object_pose.position) > 0.0
                             ? Direction::LEFT
                             : Direction::RIGHT;
 
@@ -451,7 +446,7 @@ ObjectData StaticObstacleAvoidanceModule::createObjectData(
 
 bool StaticObstacleAvoidanceModule::canYieldManeuver(const AvoidancePlanningData & data) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   // transit yield maneuver only when the avoidance maneuver is not initiated.
   if (helper_->isShifted()) {
     RCLCPP_DEBUG(getLogger(), "avoidance maneuver already initiated.");
@@ -505,7 +500,7 @@ bool StaticObstacleAvoidanceModule::canYieldManeuver(const AvoidancePlanningData
 void StaticObstacleAvoidanceModule::fillShiftLine(
   AvoidancePlanningData & data, DebugData & debug) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   auto path_shifter = path_shifter_;
 
   /**
@@ -560,7 +555,7 @@ void StaticObstacleAvoidanceModule::fillShiftLine(
 void StaticObstacleAvoidanceModule::fillEgoStatus(
   AvoidancePlanningData & data, [[maybe_unused]] DebugData & debug) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   data.state = getCurrentModuleState(data);
 
   /**
@@ -712,7 +707,7 @@ void StaticObstacleAvoidanceModule::fillEgoStatus(
 void StaticObstacleAvoidanceModule::fillDebugData(
   const AvoidancePlanningData & data, [[maybe_unused]] DebugData & debug) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   if (!data.stop_target_object) {
     return;
   }
@@ -746,7 +741,7 @@ void StaticObstacleAvoidanceModule::fillDebugData(
     data.reference_path.points, getEgoPosition(), o_front.longitudinal - total_avoid_distance);
   dead_pose_ = dead_pose_opt.has_value()
                  ? PoseWithDetail(dead_pose_opt.value())
-                 : PoseWithDetail(getPose(data.reference_path.points.front()));
+                 : PoseWithDetail(autoware_utils::get_pose(data.reference_path.points.front()));
 }
 
 void StaticObstacleAvoidanceModule::updateEgoBehavior(
@@ -792,7 +787,7 @@ void StaticObstacleAvoidanceModule::updateEgoBehavior(
 bool StaticObstacleAvoidanceModule::isSafePath(
   ShiftedPath & shifted_path, [[maybe_unused]] DebugData & debug) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & p = planner_data_->parameters;
 
   if (force_deactivated_) {
@@ -858,8 +853,7 @@ bool StaticObstacleAvoidanceModule::isSafePath(
   for (const auto & object : safety_check_target_objects) {
     auto current_debug_data = utils::path_safety_checker::createObjectDebug(object);
 
-    const auto obj_polygon =
-      autoware::universe_utils::toPolygon2d(object.initial_pose, object.shape);
+    const auto obj_polygon = autoware_utils::to_polygon2d(object.initial_pose, object.shape);
 
     const auto is_object_front = utils::path_safety_checker::isTargetObjectFront(
       getEgoPose(), obj_polygon, p.vehicle_info.max_longitudinal_offset_m);
@@ -905,7 +899,7 @@ bool StaticObstacleAvoidanceModule::isSafePath(
 PathWithLaneId StaticObstacleAvoidanceModule::extendBackwardLength(
   const PathWithLaneId & original_path) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto previous_path = helper_->getPreviousReferencePath();
 
   const auto longest_dist_to_shift_point = [&]() {
@@ -928,7 +922,7 @@ PathWithLaneId StaticObstacleAvoidanceModule::extendBackwardLength(
 
   const size_t orig_ego_idx = planner_data_->findEgoIndex(original_path.points);
   const auto prev_ego_idx = autoware::motion_utils::findNearestSegmentIndex(
-    previous_path.points, getPose(original_path.points.at(orig_ego_idx)),
+    previous_path.points, autoware_utils::get_pose(original_path.points.at(orig_ego_idx)),
     std::numeric_limits<double>::max(), planner_data_->parameters.ego_nearest_yaw_threshold);
   if (!prev_ego_idx) {
     return original_path;
@@ -937,8 +931,8 @@ PathWithLaneId StaticObstacleAvoidanceModule::extendBackwardLength(
   size_t clip_idx = 0;
   double accumulated_length = 0.0;
   for (size_t i = prev_ego_idx.value(); i > 0; i--) {
-    accumulated_length += autoware::universe_utils::calcDistance2d(
-      previous_path.points.at(i - 1), previous_path.points.at(i));
+    accumulated_length +=
+      autoware_utils::calc_distance2d(previous_path.points.at(i - 1), previous_path.points.at(i));
     if (accumulated_length > backward_length) {
       clip_idx = i;
       break;
@@ -1075,7 +1069,7 @@ auto StaticObstacleAvoidanceModule::getTurnSignal(
 
 BehaviorModuleOutput StaticObstacleAvoidanceModule::plan()
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   resetPathCandidate();
@@ -1191,7 +1185,7 @@ BehaviorModuleOutput StaticObstacleAvoidanceModule::plan()
 
 CandidateOutput StaticObstacleAvoidanceModule::planCandidate() const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   CandidateOutput output;
@@ -1235,7 +1229,7 @@ CandidateOutput StaticObstacleAvoidanceModule::planCandidate() const
 
 BehaviorModuleOutput StaticObstacleAvoidanceModule::planWaitingApproval()
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   BehaviorModuleOutput out = plan();
 
   if (path_shifter_.getShiftLines().empty()) {
@@ -1279,9 +1273,9 @@ void StaticObstacleAvoidanceModule::updatePathShifter(const AvoidLineArray & shi
       {uuid_map_.at("right"), sl_front.start, sl_back.end, relative_longitudinal});
   }
 
-  uuid_map_.at("left") = generateUUID();
-  uuid_map_.at("right") = generateUUID();
-  candidate_uuid_ = generateUUID();
+  uuid_map_.at("left") = generate_uuid();
+  uuid_map_.at("right") = generate_uuid();
+  candidate_uuid_ = generate_uuid();
 
   lockNewModuleLaunch();
 }
@@ -1292,7 +1286,7 @@ void StaticObstacleAvoidanceModule::updatePathShifter(const AvoidLineArray & shi
 void StaticObstacleAvoidanceModule::addNewShiftLines(
   PathShifter & path_shifter, const AvoidLineArray & new_shift_lines) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   ShiftLineArray future = utils::static_obstacle_avoidance::toShiftLineArray(new_shift_lines);
 
   size_t min_start_idx = std::numeric_limits<size_t>::max();
@@ -1359,7 +1353,7 @@ void StaticObstacleAvoidanceModule::addNewShiftLines(
 bool StaticObstacleAvoidanceModule::isValidShiftLine(
   const AvoidLineArray & shift_lines, const PathShifter & shifter) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   if (shift_lines.empty()) {
     return true;
   }
@@ -1412,7 +1406,7 @@ bool StaticObstacleAvoidanceModule::isValidShiftLine(
       const auto left_bound = lanelet::utils::to2D(toLineString3d(avoid_data_.left_bound));
       const auto right_bound = lanelet::utils::to2D(toLineString3d(avoid_data_.right_bound));
       for (size_t i = start_idx; i <= end_idx; ++i) {
-        const auto p = getPoint(path.points.at(i));
+        const auto p = get_point(path.points.at(i));
         lanelet::BasicPoint2d basic_point{p.x, p.y};
 
         const auto shift_length = proposed_shift_path.shift_length.at(i);
@@ -1435,7 +1429,7 @@ bool StaticObstacleAvoidanceModule::isValidShiftLine(
 
 void StaticObstacleAvoidanceModule::updateData()
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   using utils::static_obstacle_avoidance::toShiftedPath;
 
   helper_->setData(planner_data_);
@@ -1526,14 +1520,14 @@ void StaticObstacleAvoidanceModule::initRTCStatus()
 {
   left_shift_array_.clear();
   right_shift_array_.clear();
-  uuid_map_.at("left") = generateUUID();
-  uuid_map_.at("right") = generateUUID();
-  candidate_uuid_ = generateUUID();
+  uuid_map_.at("left") = generate_uuid();
+  uuid_map_.at("right") = generate_uuid();
+  candidate_uuid_ = generate_uuid();
 }
 
 void StaticObstacleAvoidanceModule::updateRTCData()
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   updateRegisteredRTCStatus(helper_->getPreviousSplineShiftPath().path);
@@ -1569,16 +1563,16 @@ void StaticObstacleAvoidanceModule::updateRTCData()
 
 void StaticObstacleAvoidanceModule::updateInfoMarker(const AvoidancePlanningData & data) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   using utils::static_obstacle_avoidance::createAmbiguousObjectsMarkerArray;
   using utils::static_obstacle_avoidance::createStopTargetObjectMarkerArray;
   using utils::static_obstacle_avoidance::createTargetObjectsMarkerArray;
 
   info_marker_.markers.clear();
-  appendMarkerArray(
+  append_marker_array(
     createTargetObjectsMarkerArray(data.target_objects, "target_objects"), &info_marker_);
-  appendMarkerArray(createStopTargetObjectMarkerArray(data), &info_marker_);
-  appendMarkerArray(
+  append_marker_array(createStopTargetObjectMarkerArray(data), &info_marker_);
+  append_marker_array(
     createAmbiguousObjectsMarkerArray(
       data.target_objects, getEgoPose(), parameters_->policy_ambiguous_vehicle),
     &info_marker_);
@@ -1588,7 +1582,7 @@ void StaticObstacleAvoidanceModule::updateDebugMarker(
   const BehaviorModuleOutput & output, const AvoidancePlanningData & data,
   const PathShifter & shifter, const DebugData & debug) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   debug_marker_.markers.clear();
   debug_marker_ = utils::static_obstacle_avoidance::createDebugMarkerArray(
     output, data, shifter, debug, parameters_);
@@ -1613,7 +1607,7 @@ void StaticObstacleAvoidanceModule::updateAvoidanceDebugData(
 
 double StaticObstacleAvoidanceModule::calcDistanceToStopLine(const ObjectData & object) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & p = parameters_;
   const auto & vehicle_width = planner_data_->parameters.vehicle_width;
 
@@ -1655,7 +1649,7 @@ double StaticObstacleAvoidanceModule::calcDistanceToStopLine(const ObjectData & 
 void StaticObstacleAvoidanceModule::insertReturnDeadLine(
   const bool use_constraints_for_decel, ShiftedPath & shifted_path) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   if (data.to_return_point > planner_data_->parameters.forward_path_length) {
@@ -1747,7 +1741,7 @@ void StaticObstacleAvoidanceModule::insertReturnDeadLine(
 void StaticObstacleAvoidanceModule::insertWaitPoint(
   const bool use_constraints_for_decel, ShiftedPath & shifted_path) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   // If avoidance path is NOT valid, don't insert any stop points.
@@ -1801,7 +1795,7 @@ void StaticObstacleAvoidanceModule::insertWaitPoint(
 void StaticObstacleAvoidanceModule::insertStopPoint(
   const bool use_constraints_for_decel, ShiftedPath & shifted_path) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   if (data.safe) {
@@ -1849,7 +1843,7 @@ void StaticObstacleAvoidanceModule::insertStopPoint(
 
 void StaticObstacleAvoidanceModule::insertPrepareVelocity(ShiftedPath & shifted_path) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   // If avoidance path is NOT safe, don't insert any slow down sections.
@@ -1964,7 +1958,7 @@ void StaticObstacleAvoidanceModule::insertPrepareVelocity(ShiftedPath & shifted_
 
 void StaticObstacleAvoidanceModule::insertAvoidanceVelocity(ShiftedPath & shifted_path) const
 {
-  universe_utils::ScopedTimeTrack st(__func__, *time_keeper_);
+  autoware_utils::ScopedTimeTrack st(__func__, *time_keeper_);
   const auto & data = avoid_data_;
 
   // do nothing if no shift line is approved.

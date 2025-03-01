@@ -32,7 +32,7 @@ void PathDecisionStateController::transit_state(
   const std::shared_ptr<OccupancyGridBasedCollisionDetector> occupancy_grid_map,
   const bool is_current_safe, const GoalPlannerParameters & parameters,
   const GoalSearcher & goal_searcher,
-  std::vector<autoware::universe_utils::Polygon2d> & ego_polygons_expanded)
+  std::vector<autoware_utils::Polygon2d> & ego_polygons_expanded)
 {
   const auto next_state = get_next_state(
     pull_over_path_opt, now, static_target_objects, dynamic_target_objects, planner_data,
@@ -47,7 +47,7 @@ PathDecisionState PathDecisionStateController::get_next_state(
   const std::shared_ptr<OccupancyGridBasedCollisionDetector> occupancy_grid_map,
   const bool is_current_safe, const GoalPlannerParameters & parameters,
   const GoalSearcher & goal_searcher,
-  std::vector<autoware::universe_utils::Polygon2d> & ego_polygons_expanded) const
+  std::vector<autoware_utils::Polygon2d> & ego_polygons_expanded) const
 {
   auto next_state = current_state_;
 
@@ -165,16 +165,13 @@ PathDecisionState PathDecisionStateController::get_next_state(
 
   // if object recognition for path collision check is enabled, transition to DECIDING to check
   // collision for a certain period of time. Otherwise, transition to DECIDED directly.
-  if (parameters.use_object_recognition) {
-    RCLCPP_DEBUG(
-      logger_,
-      "[DecidingPathStatus]: NOT_DECIDED->DECIDING. start checking collision for certain "
-      "period of time");
-    next_state.state = PathDecisionState::DecisionKind::DECIDING;
-    next_state.deciding_start_time = now;
-    return next_state;
-  }
-  return {PathDecisionState::DecisionKind::DECIDED, std::nullopt};
+  RCLCPP_DEBUG(
+    logger_,
+    "[DecidingPathStatus]: NOT_DECIDED->DECIDING. start checking collision for certain "
+    "period of time");
+  next_state.state = PathDecisionState::DecisionKind::DECIDING;
+  next_state.deciding_start_time = now;
+  return next_state;
 }
 
 }  // namespace autoware::behavior_path_planner
