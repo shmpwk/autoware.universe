@@ -86,8 +86,9 @@ bool remove_front_trajectory_point(
 Trajectory align_trajectory_with_reference_trajectory(
   const Trajectory & trajectory, const Trajectory & predicted_trajectory)
 {
-  if (trajectory.points.empty() || predicted_trajectory.points.empty() ||
-      trajectory.points.size() < 2) {
+  if (
+    trajectory.points.empty() || predicted_trajectory.points.empty() ||
+    trajectory.points.size() < 2) {
     return Trajectory();
   }
 
@@ -162,8 +163,9 @@ Trajectory align_trajectory_with_reference_trajectory(
   auto reversed_trajectory_points = reverse_trajectory_points(trajectory_points);
   auto reversed_modified_trajectory_points = reverse_trajectory_points(modified_trajectory_points);
 
-  if (reversed_trajectory_points.empty() || reversed_modified_trajectory_points.empty() ||
-      reversed_predicted_trajectory_points.empty()) {
+  if (
+    reversed_trajectory_points.empty() || reversed_modified_trajectory_points.empty() ||
+    reversed_predicted_trajectory_points.empty()) {
     return Trajectory();
   }
 
