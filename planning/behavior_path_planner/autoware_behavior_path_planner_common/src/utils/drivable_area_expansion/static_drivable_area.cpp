@@ -622,8 +622,8 @@ std::vector<Point> updateBoundary(
     if (removed_start_idx > removed_end_idx || removed_end_idx >= updated_bound.size()) {
       auto clock{rclcpp::Clock{RCL_ROS_TIME}};
       RCLCPP_ERROR_STREAM_THROTTLE(
-      rclcpp::get_logger("behavior_path_planner").get_child("utils"), clock, 1000,
-      "Invalid index for erase in updateBoundary. Skipping.");
+        rclcpp::get_logger("behavior_path_planner").get_child("utils"), clock, 1000,
+        "Invalid index for erase in updateBoundary. Skipping.");
       continue;
     }
 
